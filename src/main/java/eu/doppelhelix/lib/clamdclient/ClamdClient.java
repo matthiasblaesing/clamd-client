@@ -39,11 +39,11 @@ import static java.nio.charset.StandardCharsets.UTF_8;
 public class ClamdClient {
 
     private static final byte[] PING_CMD = "zPING\000".getBytes(UTF_8);
-    private static final byte[] PONG_REPLY = "PONG\000".getBytes(UTF_8);
+    private static final byte[] PONG_REPLY = "PONG".getBytes(UTF_8);
     private static final byte[] VERSION_CMD = "zVERSION\000".getBytes(UTF_8);
     private static final byte[] VERSIONCOMMANDS_CMD = "zVERSIONCOMMANDS\000".getBytes(UTF_8);
     private static final byte[] RELOAD_CMD = "zRELOAD\000".getBytes(UTF_8);
-    private static final byte[] RELOADING_REPLY = "RELOADING\000".getBytes(UTF_8);
+    private static final byte[] RELOADING_REPLY = "RELOADING".getBytes(UTF_8);
     private static final byte[] INSTREAM_CMD = "zINSTREAM\000".getBytes(UTF_8);
     private static final byte[] SHUTDOWN_CMD = "zSHUTDOWN\000".getBytes(UTF_8);
 
@@ -134,18 +134,22 @@ public class ClamdClient {
             writeToChannel(selectionKey, ByteBuffer.wrap(VERSIONCOMMANDS_CMD), baseTimeout);
             byte[] result = readFromChannel(selectionKey, baseTimeout);
             String versionString = new String(result, UTF_8);
-            String[] splittedString = versionString.split("\\| COMMANDS:");
-            if (splittedString.length < 2) {
-                return new VersionCommands(splittedString[0]);
-            } else {
-                List<String> commands = Arrays
-                        .stream(splittedString[1].split("\\s"))
-                        .filter(s -> !s.isBlank())
-                        .map(s -> s.trim())
-                        .collect(Collectors.toUnmodifiableList());
-                return new VersionCommands(splittedString[0], commands);
-            }
+            return parseVersionsCommands(versionString);
         });
+    }
+
+    static VersionCommands parseVersionsCommands(String versionString) {
+        String[] splittedString = versionString.split("\\| COMMANDS:");
+        if (splittedString.length < 2) {
+            return new VersionCommands(splittedString[0]);
+        } else {
+            List<String> commands = Arrays
+                    .stream(splittedString[1].split("\\s"))
+                    .filter(s -> !s.isBlank())
+                    .map(s -> s.trim())
+                    .collect(Collectors.toUnmodifiableList());
+            return new VersionCommands(splittedString[0], commands);
+        }
     }
 
     public ScanResult scanStream(byte[] input) throws IOException {
@@ -159,6 +163,7 @@ public class ClamdClient {
             byte[] buffer = new byte[4096 + 4];
             ByteBuffer bb = ByteBuffer.wrap(buffer);
 
+            boolean earlyReply = false; // Did clamd reply while we were still streaming?
             try {
                 while (true) {
                     int read = is.read(buffer, 4, 4096);
@@ -169,34 +174,47 @@ public class ClamdClient {
                     bb.position(0);
                     bb.limit(4 + read);
                     writeToChannel(selectionKey, bb, baseTimeout);
+
+                    selectionKey.interestOps(SelectionKey.OP_READ);
+                    selectionKey.selector().selectNow();
+                    if(selectionKey.isReadable()) {
+                        earlyReply = true;
+                        break;
+                    }
                 }
 
-                bb.position(0);
-                bb.limit(4);
-                bb.putInt(0, 0);
-                writeToChannel(selectionKey, bb, baseTimeout);
+                if (!earlyReply) {
+                    bb.position(0);
+                    bb.limit(4);
+                    bb.putInt(0, 0);
+                    writeToChannel(selectionKey, bb, baseTimeout);
+                }
             } catch (IOException ex) {
             }
 
             String result = new String(readFromChannel(selectionKey, scanTimeout), UTF_8);
 
-            if (result.endsWith(" FOUND")) {
-                // Assume that the last ": " sequence is the separator between
-                // the path and the virusname i.e. "<PATH>: <VIRUSNAME> <STATUS>"
-                int lastColon = result.lastIndexOf(": ");
-                String virusName = result;
-                if(lastColon >= 0 && (lastColon + 2 < (result.length() - 6))) {
-                    virusName = result.substring(lastColon + 2, result.length() - 6).trim();
-                }
-                return new ScanResult(ScanState.FOUND, result, virusName);
-            } else if (result.endsWith(" ERROR")) {
-                return new ScanResult(ScanState.ERROR, result, null);
-            } else if (result.endsWith(" OK")) {
-                return new ScanResult(ScanState.OK, result, null);
-            } else {
-                return new ScanResult(ScanState.ERROR, "Unexpected scanning result: " + result, null);
-            }
+            return parseResultLine(result);
         });
+    }
+
+    static ScanResult parseResultLine(String result) {
+        if (result.endsWith(" FOUND")) {
+            // Assume that the last ": " sequence is the separator between
+            // the path and the virusname i.e. "<PATH>: <VIRUSNAME> <STATUS>"
+            int lastColon = result.lastIndexOf(": ");
+            String virusName = result;
+            if(lastColon >= 0 && (lastColon + 2 < (result.length() - 6))) {
+                virusName = result.substring(lastColon + 2, result.length() - 6).trim();
+            }
+            return new ScanResult(ScanState.FOUND, result, virusName);
+        } else if (result.endsWith(" ERROR")) {
+            return new ScanResult(ScanState.ERROR, result, null);
+        } else if (result.endsWith(" OK")) {
+            return new ScanResult(ScanState.OK, result, null);
+        } else {
+            return new ScanResult(ScanState.ERROR, "Unexpected scanning result: " + result, null);
+        }
     }
 
     private SelectionKey establishConnection(final SocketChannel sc, final Selector selector) throws IOException {
