@@ -28,5 +28,9 @@ public class ManualTest {
         try (FileInputStream fis = new FileInputStream("/home/matthias/Downloads/virustest/Friday_the_13th.540.A.com")) {
             System.out.println(client.scanStream(fis));
         }
+
+        try (FileInputStream fis = new FileInputStream("/home/matthias/img1000")) {
+            System.out.println(client.scanStream(fis));
+        }
     }
 }
