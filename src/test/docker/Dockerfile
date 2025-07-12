@@ -14,6 +14,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+# Should be synced with <distro-root>/.github/workflows
+
 FROM ubuntu:24.04
 
 RUN apt-get update
