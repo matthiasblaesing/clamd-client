@@ -24,7 +24,7 @@
 
     <scm>
         <connection>scm:git:https://github.com/matthiasblaesing/clamd-client.git</connection>
-        <developerConnection>scm:git:ssh://git@github.com:matthiasblaesing/clamd-client.git</developerConnection>
+        <developerConnection>scm:git:ssh://git@github.com/matthiasblaesing/clamd-client.git</developerConnection>
         <url>https://github.com/matthiasblaesing/clamd-client/</url>
         <tag>HEAD</tag>
     </scm>
