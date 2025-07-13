@@ -1,0 +1,55 @@
+# Copyright 2025 Matthias Bläsing
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# Should be synced with src/test/docker/Dockerfile and src/test/docker/runtest.sh
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-and-test:
+    runs-on: ubuntu-24.04
+    name: Run integration test
+    steps:
+      - uses: actions/checkout@v4
+      - name: Setup Installation
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y openjdk-21-jdk maven clamav-daemon
+          sudo systemctl stop clamav-freshclam.service
+          sudo freshclam
+          clamd --config-file src/test/docker/clamd.conf --log=/tmp/clamd.log
+      - name: Run build
+        run: mvn --no-transfer-progress -Prelease-profile -DskipTests install
+      - name: Run integration tests
+        run: mvn --no-transfer-progress integration-test surefire-report:report-only surefire-report:failsafe-report-only verify
+      - name: Upload reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: report
+          path: |
+            target/surefire-reports
+            target/failsafe-reports
+            target/reports
+      - name: Upload build-artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-artefacts
+          path: target/clamd-client*.jar
