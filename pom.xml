@@ -3,7 +3,7 @@
     <modelVersion>4.0.0</modelVersion>
     <groupId>eu.doppel-helix.lib.clamd-client</groupId>
     <artifactId>clamd-client</artifactId>
-    <version>1.0</version>
+    <version>1.1-SNAPSHOT</version>
 
     <name>Client for ClamAV Daemon</name>
     <description>Client for ClamAV Daemon, supporting TCP and unix domain sockets as transport. Only requiring JDK 17+ as runtime.</description>
