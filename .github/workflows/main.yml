@@ -36,9 +36,9 @@ jobs:
           sudo freshclam
           clamd --config-file src/test/docker/clamd.conf --log=/tmp/clamd.log
       - name: Run build
-        run: mvn --no-transfer-progress -Prelease-profile -DskipTests install
+        run: mvn --no-transfer-progress -DskipTests install
       - name: Run integration tests
-        run: mvn --no-transfer-progress integration-test surefire-report:report-only surefire-report:failsafe-report-only verify
+        run: mvn --no-transfer-progress -Prun-it integration-test surefire-report:report-only surefire-report:failsafe-report-only verify
       - name: Upload reports
         if: always()
         uses: actions/upload-artifact@v4
