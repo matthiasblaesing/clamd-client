@@ -4,6 +4,23 @@ Client for ClamAV Daemon
 Client for ClamAV Daemon, supporting TCP and unix domain sockets as transport.
 Only requiring JDK 17+ as runtime.
 
+Usage
+-----
+
+```java
+// Initialize client with unix domain socket path or alternatively with
+// host and port
+ClamdClient client = new ClamdClient("/var/run/clamav/clamd.ctl");
+
+// Scan data from stream
+try (FileInputStream fis = new FileInputStream("<path_to_file>")) {
+    System.out.println(client.scanStream(fis));
+}
+
+// Scan data from byte array
+System.out.println(client.scanStream(data));
+```
+
 Testing
 -------
 
