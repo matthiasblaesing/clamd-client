@@ -22,9 +22,18 @@ public class ClamdClientTestIT {
 
     private static final ClamdClient TCP_CLIENT = new ClamdClient("localhost", 3310);
     private static final ClamdClient UNIX_CLIENT = new ClamdClient("/tmp/clamd.ctl");
+    private static final String LOG_FILE = isWindows() ? "c:/temp/clamd.log" : "/tmp/clamd.log";
 
     private static Stream<ClamdClient> provideClients() {
-        return Stream.of(TCP_CLIENT, UNIX_CLIENT);
+        if(isWindows()) {
+            return Stream.of(TCP_CLIENT);
+        } else {
+            return Stream.of(TCP_CLIENT, UNIX_CLIENT);
+        }
+    }
+
+    static boolean isWindows() {
+        return System.getProperty("os.name").startsWith("Windows");
     }
 
     @ParameterizedTest
@@ -59,15 +68,15 @@ public class ClamdClientTestIT {
     @MethodSource("provideClients")
     @SuppressWarnings({"ThrowableResultIgnored", "SleepWhileInLoop"})
     public void testReload(ClamdClient client) throws Exception {
-        Files.write(Path.of("/tmp/clamd.log"), new byte[0], StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
+        Files.write(Path.of(LOG_FILE), new byte[0], StandardOpenOption.CREATE, StandardOpenOption.TRUNCATE_EXISTING);
         assertFalse(
-                Files.readString(Path.of("/tmp/clamd.log"), StandardCharsets.UTF_8)
+                Files.readString(Path.of(LOG_FILE), StandardCharsets.UTF_8)
                         .contains("Database correctly reloaded")
         );
         client.reload();
         boolean reloaded = false;
         for (int i = 0; i < 120; i++) {
-            reloaded = Files.readString(Path.of("/tmp/clamd.log"), StandardCharsets.UTF_8)
+            reloaded = Files.readString(Path.of(LOG_FILE), StandardCharsets.UTF_8)
                     .contains("Database correctly reloaded");
             if (reloaded) {
                 break;
@@ -163,7 +172,7 @@ public class ClamdClientTestIT {
     @ParameterizedTest
     @MethodSource("provideClients")
     public void testLargeStreamStream(ClamdClient client) throws Exception {
-        byte[] dummyData = new byte[15 * 1000 * 1000];
+        byte[] dummyData = new byte[150 * 1000 * 1000];
         ScanResult sr = client.scanStream(new ByteArrayInputStream(dummyData));
         assertEquals(ScanState.ERROR, sr.state());
         assertNull(sr.virus());
